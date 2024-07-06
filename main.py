@@ -34,7 +34,7 @@ if channel_secret is None:
     print('Specify LINE_CHANNEL_SECRET as environment variable.')
     sys.exit(1)
 if channel_access_token is None:
-    print('Specify LINE_CHANNEL_ACCESS_TOKEN as環境變數.')
+    print('Specify LINE_CHANNEL_ACCESS_TOKEN as environment variable.')
     sys.exit(1)
 
 configuration = Configuration(access_token=channel_access_token)
@@ -108,6 +108,8 @@ async def handle_callback(request: Request):
                     reply_msg = f"這是詐騙訊息。詐騙訊息分析:\n\n{advice}\n\n你的當前分數是：{user_score}分"
             else:
                 reply_msg = '目前沒有可供解析的訊息，請先輸入「出題」生成一個範例。'
+        elif text == "查看分數":
+            reply_msg = f"你的當前分數是：{user_score}分"
         else:
             reply_msg = '未能識別的指令，請輸入「出題」生成一個詐騙訊息範例，或輸入「是」或「否」來判斷上一個生成的範例。'
 
