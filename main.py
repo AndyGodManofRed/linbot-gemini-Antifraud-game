@@ -116,7 +116,7 @@ async def handle_callback(request: Request):
             else:
                 reply_msg = '目前沒有可供解析的訊息，請先輸入「出題」生成一個範例。'
         elif text == "排行榜":
-            get_rank(user_id,firebase_url)
+            reply_msg=get_rank(user_id,firebase_url)
         await line_bot_api.reply_message(
             ReplyMessageRequest(
                 reply_token=event.reply_token,
