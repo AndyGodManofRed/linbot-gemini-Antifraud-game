@@ -215,9 +215,9 @@ def get_sorted_scores(firebase_url,path):
 def get_rank(current_user_id,firebase_url):
 
     # 設定表格的欄位寬度
-    rank_width = 7
-    user_width = 14
-    score_width = 11
+    rank_width = 8
+    user_width = 15
+    score_width = 12
     total_width = rank_width + user_width + score_width + 4  # 包括分隔符號
 
     sorted_scores = get_sorted_scores(firebase_url,'scores/')
@@ -227,7 +227,7 @@ def get_rank(current_user_id,firebase_url):
 
     # 表格頂部邊界
     table_str += '+' + '-' * total_width + '+\n'
-    table_str += '|' + "排行榜".center(total_width-3) + '|\n'
+    table_str += '|' + "排行榜".center(total_width) + '|\n'
     table_str += '+' + '-' * total_width + '+\n'
     table_str += f"|{'排名'.center(rank_width)}|{'User'.center(user_width)}|{'Score'.center(score_width)}|\n"
     table_str += '+' + '-' * rank_width + '+' + '-' * user_width + '+' + '-' * score_width + '+\n'
@@ -237,7 +237,7 @@ def get_rank(current_user_id,firebase_url):
         for user, score in sorted_scores:
             # 標記當前使用者
             if user == current_user_id:
-                user_display = f'*{user[:user_width]}*'
+                user_display = f'Your ID'
             else:
                 user_display = user[:5]
 
