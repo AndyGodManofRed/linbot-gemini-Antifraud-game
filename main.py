@@ -117,12 +117,27 @@ async def handle_callback(request: Request):
                 reply_msg = '目前沒有可供解析的訊息，請先輸入「出題」生成一個範例。'
         elif text == "排行榜":
             reply_msg=get_rank(user_id,firebase_url)
+        else:
+            prompt = (
+                f"使用者訊息: {text}\n"
+                "請判斷這個訊息是否與詐騙或假訊息有關。如果有，請詳細回答有關詐騙或假訊息的問題；"
+                "如果沒有，請回答「目前沒有提供其他問題的諮詢」。\n"
+                "如果訊息與詐騙有關，請按照以下格式回答：\n"
+                "1. 詐騙或假訊息描述：\n"
+                "2. 如何辨別詐騙或假訊息：\n"
+                "3. 防範措施：\n"
+                "4. 範例或建議：\n"
+                "請以教育性和提醒性的語氣回答，幫助人們提高警惕。"
+            )
+            reply_msg= model.generate_content(prompt)
+
+            
         await line_bot_api.reply_message(
             ReplyMessageRequest(
                 reply_token=event.reply_token,
                 messages=[TextMessage(text=reply_msg)]
             ))
-
+        
     return 'OK'
 
 def generate_examples():
