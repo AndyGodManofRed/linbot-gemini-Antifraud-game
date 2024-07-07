@@ -1,26 +1,19 @@
 from fastapi import FastAPI, HTTPException, Request
 import logging
 import os
-import re
 import sys
-from datetime import datetime
 from dotenv import load_dotenv
-from linebot.v3.webhook import WebhookParser
-from linebot.v3.messaging import (
-    AsyncApiClient,
-    AsyncMessagingApi,
-    Configuration,
-    ReplyMessageRequest,
-    TextMessage
+from linebot import (
+    LineBotApi, WebhookParser
 )
-from linebot.v3.exceptions import InvalidSignatureError
-from linebot.v3.webhooks import MessageEvent, TextMessageContent
-
-import uvicorn
-import requests
-import google.generativeai as genai
+from linebot.exceptions import InvalidSignatureError
+from linebot.models import (
+    MessageEvent, TextMessage, TextSendMessage, ConfirmTemplate, MessageAction, TemplateSendMessage
+)
 from firebase import firebase
 import random
+import uvicorn
+import google.generativeai as genai
 
 logging.basicConfig(level=os.getenv('LOG', 'WARNING'))
 logger = logging.getLogger(__file__)
@@ -30,16 +23,11 @@ app = FastAPI()
 load_dotenv()
 channel_secret = os.getenv('LINE_CHANNEL_SECRET', None)
 channel_access_token = os.getenv('LINE_CHANNEL_ACCESS_TOKEN', None)
-if channel_secret is None:
-    print('Specify LINE_CHANNEL_SECRET as environment variable.')
-    sys.exit(1)
-if channel_access_token is None:
-    print('Specify LINE_CHANNEL_ACCESS_TOKEN as環境變數.')
+if channel_secret is None or channel_access_token is None:
+    logger.error('Specify LINE_CHANNEL_SECRET and LINE_CHANNEL_ACCESS_TOKEN as environment variables.')
     sys.exit(1)
 
-configuration = Configuration(access_token=channel_access_token)
-async_api_client = AsyncApiClient(configuration)
-line_bot_api = AsyncMessagingApi(async_api_client)
+line_bot_api = LineBotApi(channel_access_token)
 parser = WebhookParser(channel_secret)
 
 firebase_url = os.getenv('FIREBASE_URL')
@@ -63,7 +51,6 @@ async def health():
 @app.post("/webhooks/line")
 async def handle_callback(request: Request):
     signature = request.headers['X-Line-Signature']
-
     body = await request.body()
     body = body.decode()
 
@@ -73,71 +60,60 @@ async def handle_callback(request: Request):
         raise HTTPException(status_code=400, detail="Invalid signature")
 
     for event in events:
-        logging.info(event)
-        if not isinstance(event, MessageEvent):
+        if not isinstance(event, MessageEvent) or not isinstance(event.message, TextMessage):
             continue
-        if not isinstance(event.message, TextMessageContent):
-            continue
-        text = event.message.text.strip()
+
         user_id = event.source.user_id
-
         fdb = firebase.FirebaseApplication(firebase_url, None)
-        if event.source.type == 'group':
-            user_chat_path = f'chat/{event.source.group_id}'
-        else:
-            user_chat_path = f'chat/{user_id}'
-        chatgpt = fdb.get(user_chat_path, None)
-
         user_score_path = f'scores/{user_id}'
         user_score = fdb.get(user_score_path, None) or 0
 
-        if text == "出題":
+        if event.message.text == '出題':
             scam_example, correct_example = generate_examples()
             messages = [{'role': 'bot', 'parts': [scam_example, correct_example]}]
-            fdb.put_async(user_chat_path, None, messages)
-            reply_msg = f"訊息:\n\n{scam_example}\n\n請判斷這是否為詐騙訊息（請回覆'是'或'否'）"
-        elif text == "分數":
+            fdb.put_async(f'chat/{user_id}', None, messages)
+            reply_msg = f"{scam_example}\n\n請判斷這是否為詐騙訊息"
+            confirm_template = ConfirmTemplate(
+                text='請判斷是否為詐騙訊息。',
+                actions=[
+                    MessageAction(label='是', text='是'),
+                    MessageAction(label='否', text='否')
+                ]
+            )
+            template_message = TemplateSendMessage(alt_text='出題', template=confirm_template)
+            line_bot_api.reply_message(event.reply_token, [TextSendMessage(text=reply_msg), template_message])
+        elif event.message.text == '分數':
             reply_msg = f"你的當前分數是：{user_score}分"
-        elif text in ["是", "否"]:
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_msg))
+        elif event.message.text in ['是', '否']:
+            chatgpt = fdb.get(f'chat/{user_id}', None)
             if chatgpt and len(chatgpt) > 0 and chatgpt[-1]['role'] == 'bot':
                 scam_message, correct_message = chatgpt[-1]['parts']
                 is_scam = scam_message is not None
-                user_response = text == "是"
-                
+                user_response = event.message.text == '是'
+
                 if user_response == is_scam:
                     user_score += 50
                     fdb.put_async(user_score_path, None, user_score)
                     reply_msg = f"你好棒！你的當前分數是：{user_score}分"
                 else:
                     user_score -= 50
+                    if user_score < 50:
+                        user_score = 0
                     fdb.put_async(user_score_path, None, user_score)
                     advice = analyze_response(scam_message if is_scam else correct_message, is_scam, user_response)
                     reply_msg = f"這是{'詐騙' if is_scam else '正確'}訊息。分析如下:\n\n{advice}\n\n你的當前分數是：{user_score}分"
+                line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_msg))
             else:
                 reply_msg = '目前沒有可供解析的訊息，請先輸入「出題」生成一個範例。'
-        elif text == "排行榜":
-            reply_msg=get_rank(user_id,firebase_url)
+                line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_msg))
+        elif event.message.text == "排行榜":
+            reply_msg = get_rank(user_id, firebase_url)
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_msg))
         else:
-            prompt = (
-                f"使用者訊息: {text}\n"
-                "請判斷這個訊息是否與詐騙或假訊息有關。如果有，請詳細回答有關詐騙或假訊息的問題；"
-                "如果沒有，請回答「目前沒有提供其他問題的諮詢」。\n"
-                "如果訊息與詐騙有關，請按照以下格式回答：\n"
-                "1. 詐騙或假訊息描述：\n"
-                "2. 如何辨別詐騙或假訊息：\n"
-                "3. 防範措施：\n"
-                "4. 範例或建議：\n"
-                "請以教育性和提醒性的語氣回答，幫助人們提高警惕。"
-            )
-            reply_msg= model.generate_content(prompt)
+            reply_msg = '請先回答「是」或「否」來判斷詐騙訊息，再查看解析。'
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_msg))
 
-            
-        await line_bot_api.reply_message(
-            ReplyMessageRequest(
-                reply_token=event.reply_token,
-                messages=[TextMessage(text=reply_msg)]
-            ))
-        
     return 'OK'
 
 def generate_examples():
@@ -210,51 +186,67 @@ def analyze_response(text, is_scam, user_response):
     response = model.generate_content(prompt)
     return response.text.strip()
 
-
-def get_sorted_scores(firebase_url,path):
-
+def get_sorted_scores(firebase_url, path):
     fdb = firebase.FirebaseApplication(firebase_url, None)
-    # 從 Firebase 獲取 score 節點下的所有資料
     scores = fdb.get(path, None)
     
     if scores:
-        # 將資料轉換成 (user, score) 的列表
         score_list = [(user, score) for user, score in scores.items()]
-        # 按照分數進行排序，從高到低
         sorted_score_list = sorted(score_list, key=lambda x: x[1], reverse=True)
         return sorted_score_list
     else:
         return []
+        
+from linebot import LineBotApi
+from linebot.exceptions import LineBotApiError
+from linebot.models import ImageSendMessage
+import requests
+import pygame
+
+# 初始化LineBotApi
+line_bot_api = LineBotApi(channel_access_token)
+def get_user_profile(user_id):
+    try:
+        # 使用LineBotApi的get_profile方法來獲取使用者資料
+        profile = line_bot_api.get_profile(user_id)
+        return profile.display_name  # 返回使用者的顯示名稱
+    except LineBotApiError as e:
+        print("LineBotApiError:", e)
+        return None
 
 
 def get_rank(current_user_id,firebase_url):
 
     # 設定表格的欄位寬度
-    rank_width = 8
-    user_width = 15
-    score_width = 12
+    rank_width = 7
+    user_width = 14
+    score_width = 11
     total_width = rank_width + user_width + score_width + 4  # 包括分隔符號
 
-    sorted_scores = get_sorted_scores(firebase_url,'scores/')
+    sorted_scores = get_sorted_scores(firebase_url, 'scores/')
 
     # 初始化表格字串
     table_str = ''
 
     # 表格頂部邊界
     table_str += '+' + '-' * total_width + '+\n'
-    table_str += '|' + "排行榜".center(total_width) + '|\n'
+    table_str += '|' + "排行榜".center(total_width-3) + '|\n'
     table_str += '+' + '-' * total_width + '+\n'
     table_str += f"|{'排名'.center(rank_width)}|{'User'.center(user_width)}|{'Score'.center(score_width)}|\n"
     table_str += '+' + '-' * rank_width + '+' + '-' * user_width + '+' + '-' * score_width + '+\n'
 
     if sorted_scores:
         i = 1
-        for user, score in sorted_scores:
-            # 標記當前使用者
-            if user == current_user_id:
-                user_display = f'Your ID'
+        for user_id, score in sorted_scores:
+            user_name = get_user_profile(user_id)
+            if user_name is None:
+                user_display = user_id[:5]  # 如果無法取得使用者名稱，顯示部分使用者 ID
             else:
-                user_display = user[:5]
+                user_display = user_name[:user_width]
+
+            # 標記當前使用者
+            if user_id == current_user_id:
+                user_display = f'*{user_display}*'
 
             table_str += f"|{str(i).center(rank_width)}|{user_display.center(user_width)}|{str(score).center(score_width)}|\n"
             table_str += '+' + '-' * rank_width + '+' + '-' * user_width + '+' + '-' * score_width + '+\n'
@@ -263,6 +255,58 @@ def get_rank(current_user_id,firebase_url):
         table_str += '|' + '目前無人上榜'.center(total_width) + '|\n'
         table_str += '+' + '-' * total_width + '+\n'
     return table_str
+
+def safe_table_as_file(table, user_id):
+    pygame.init()
+    font = pygame.font.Font("ChenYuluoyan-Thin-Monospaced.ttf", 16)
+
+    lines = table.splitlines()
+    line_height = font.size("Test")[1]
+    image_height = len(lines) * line_height
+    image = pygame.Surface((400, image_height))
+    image.fill((0, 0, 0))
+
+    y = 0
+    for line in lines:
+        ftext = font.render(line, True, (255, 255, 255))
+        image.blit(ftext, (0, y))
+        y += line_height
+
+    image_path = "image.jpg"
+    pygame.image.save(image, image_path)
+
+    # 上傳圖片到 Imgur
+    imgur_client_id = os.getenv('IMGUR_CLIENT_ID')
+    headers = {"Authorization": f"Client-ID {imgur_client_id}"}
+    with open(image_path, 'rb') as img:
+        response = requests.post(
+            "https://api.imgur.com/3/upload",
+            headers=headers,
+            files={"image": img}
+        )
+    
+    if response.status_code == 200:
+        image_url = response.json()['data']['link']
+        send_image_to_user(user_id, image_url)
+        # 刪除本地存儲的圖片
+        os.remove(image_path)
+    else:
+        print("Failed to upload image to Imgur")
+        # 如果上傳失敗，可以根據需要選擇是否刪除圖片
+        os.remove(image_path)
+
+def send_image_to_user(user_id, image_url):
+    try:
+        line_bot_api.push_message(
+            user_id,
+            ImageSendMessage(
+                original_content_url=image_url,
+                preview_image_url=image_url
+            )
+        )
+    except LineBotApiError as e:
+        print(f"LineBotApiError: {e}")
+
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
