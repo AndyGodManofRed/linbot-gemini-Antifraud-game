@@ -21,8 +21,6 @@ import requests
 import google.generativeai as genai
 from firebase import firebase
 import random
-import User_rank
-
 
 logging.basicConfig(level=os.getenv('LOG', 'WARNING'))
 logger = logging.getLogger(__file__)
@@ -97,7 +95,7 @@ async def handle_callback(request: Request):
             scam_example, correct_example = generate_examples()
             messages = [{'role': 'bot', 'parts': [scam_example, correct_example]}]
             fdb.put_async(user_chat_path, None, messages)
-            reply_msg = f"詐騙訊息:\n\n{scam_example}\n\n請判斷這是否為詐騙訊息（請回覆'是'或'否'）"
+            reply_msg = f"訊息:\n\n{scam_example}\n\n請判斷這是否為詐騙訊息（請回覆'是'或'否'）"
         elif text == "分數":
             reply_msg = f"你的當前分數是：{user_score}分"
         elif text in ["是", "否"]:
@@ -117,11 +115,8 @@ async def handle_callback(request: Request):
                     reply_msg = f"這是{'詐騙' if is_scam else '正確'}訊息。分析如下:\n\n{advice}\n\n你的當前分數是：{user_score}分"
             else:
                 reply_msg = '目前沒有可供解析的訊息，請先輸入「出題」生成一個範例。'
-        elif text == "排行榜" :
-            leaderBoard=get_rank(user_id,firebase_url)
-        else:
-            reply_msg = '未能識別的指令，請輸入「出題」生成一個詐騙訊息範例，或輸入「是」或「否」來判斷上一個生成的範例。'
-
+        elif text == "排行榜":
+            get_rank(user_id,firebase_url)
         await line_bot_api.reply_message(
             ReplyMessageRequest(
                 reply_token=event.reply_token,
@@ -196,12 +191,10 @@ def analyze_response(text, is_scam, user_response):
                 "請以教育性和提醒性的語氣回答，幫助人們提高辨別真實訊息的能力。"
                 "不要使用任何粗體或任何特殊格式，例如＊或是-，不要使用markdown語法，只需使用純文本。不要使用破折號，而是使用數字列表。"
             )
-
     model = genai.GenerativeModel('gemini-pro')
     response = model.generate_content(prompt)
     return response.text.strip()
 
-import io
 
 def get_sorted_scores(firebase_url,path):
 
@@ -219,29 +212,25 @@ def get_sorted_scores(firebase_url,path):
         return []
 
 
-
 def get_rank(current_user_id,firebase_url):
-    # 假設 'U89390a25e' 是當前使用者的 ID
-    current_user_id = current_user_id
-    firebase_url=firebase_url
 
     # 設定表格的欄位寬度
     rank_width = 7
-    user_width = 11
+    user_width = 14
     score_width = 11
     total_width = rank_width + user_width + score_width + 4  # 包括分隔符號
 
     sorted_scores = get_sorted_scores(firebase_url,'scores/')
 
-    # 使用 StringIO 模擬字串緩衝區
-    output = io.StringIO()
+    # 初始化表格字串
+    table_str = ''
 
     # 表格頂部邊界
-    output.write('+' + '-' * total_width + '+\n')
-    output.write('|' + "排行榜".center(total_width) + '|\n')
-    output.write('+' + '-' * total_width + '+\n')
-    output.write(f"|{'排名'.center(rank_width)}|{'User'.center(user_width)}|{'Score'.center(score_width)}|\n")
-    output.write('+' + '-' * rank_width + '+' + '-' * user_width + '+' + '-' * score_width + '+\n')
+    table_str += '+' + '-' * total_width + '+\n'
+    table_str += '|' + "排行榜".center(total_width-3) + '|\n'
+    table_str += '+' + '-' * total_width + '+\n'
+    table_str += f"|{'排名'.center(rank_width)}|{'User'.center(user_width)}|{'Score'.center(score_width)}|\n"
+    table_str += '+' + '-' * rank_width + '+' + '-' * user_width + '+' + '-' * score_width + '+\n'
 
     if sorted_scores:
         i = 1
@@ -250,22 +239,15 @@ def get_rank(current_user_id,firebase_url):
             if user == current_user_id:
                 user_display = f'*{user[:user_width]}*'
             else:
-                user_display = user[:user_width]
+                user_display = user[:5]
 
-            output.write(f"|{str(i).center(rank_width)}|{user_display.center(user_width)}|{str(score).center(score_width)}|\n")
-            output.write('+' + '-' * rank_width + '+' + '-' * user_width + '+' + '-' * score_width + '+\n')
+            table_str += f"|{str(i).center(rank_width)}|{user_display.center(user_width)}|{str(score).center(score_width)}|\n"
+            table_str += '+' + '-' * rank_width + '+' + '-' * user_width + '+' + '-' * score_width + '+\n'
             i += 1
     else:
-        output.write('|' + '目前無人上榜'.center(total_width) + '|\n')
-        output.write('+' + '-' * total_width + '+\n')
-
-    # 獲取字串內容
-    leaderboard_str = output.getvalue()
-    output.close()
-
-    return leaderboard_str
-
-
+        table_str += '|' + '目前無人上榜'.center(total_width) + '|\n'
+        table_str += '+' + '-' * total_width + '+\n'
+    return table_str
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
