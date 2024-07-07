@@ -108,8 +108,8 @@ async def handle_callback(request: Request):
                 reply_msg = '目前沒有可供解析的訊息，請先輸入「出題」生成一個範例。'
                 line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_msg))
         elif event.message.text == "排行榜":
-            reply_msg = get_rank(user_id, firebase_url)
-            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_msg))
+            leaderboard = get_rank(user_id, firebase_url)
+            safe_table_as_file(leaderboard,user_id)
         else:
             reply_msg = '請先回答「是」或「否」來判斷詐騙訊息，再查看解析。'
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_msg))
