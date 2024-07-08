@@ -23,18 +23,31 @@ logger = logging.getLogger(__file__)
 app = FastAPI()
 
 load_dotenv()
+load_dotenv()
 channel_secret = os.getenv('LINE_CHANNEL_SECRET', None)
 channel_access_token = os.getenv('LINE_CHANNEL_ACCESS_TOKEN', None)
 if channel_secret is None or channel_access_token is None:
     logger.error('Specify LINE_CHANNEL_SECRET and LINE_CHANNEL_ACCESS_TOKEN as environment variables.')
+if channel_secret is None or channel_access_token is None:
+    logger.error('Specify LINE_CHANNEL_SECRET and LINE_CHANNEL_ACCESS_TOKEN as environment variables.')
     sys.exit(1)
 
+line_bot_api = LineBotApi(channel_access_token)
 line_bot_api = LineBotApi(channel_access_token)
 parser = WebhookParser(channel_secret)
 
 firebase_url = os.getenv('FIREBASE_URL')
 
 
+scam_templates = [
+    "【國泰世華】您的銀行賬戶顯示異常，請立即登入綁定用戶資料，否則賬戶將凍結使用 www.cathay-bk.com",
+    "我朋友參加攝影比賽麻煩幫忙投票 http://www.yahoonikk.info/page/vote.pgp?pid=51",
+    "登入FB就投票成功了我手機當機 line用不了 想請你幫忙安全認證 幫我收個認證簡訊 謝謝 你LINE的登陸認證密碼記得嗎 認證要用到 確認是本人幫忙認證",
+    "您的LINE已違規使用，將在24小時內註銷，請使用谷歌瀏覽器登入電腦網站並掃碼驗證解除違規 www.line-wbe.icu",
+    "【台灣自來水公司】貴戶本期水費已逾期，總計新台幣395元整，務請於6月16日前處理繳費，詳情繳費：https://bit.ly/4cnMNtE 若再超過上述日期，將終止供水",
+    "萬聖節快樂🎃 活動免費貼圖無限量下載 https://lineeshop.com",
+    "【台灣電力股份有限公司】貴戶本期電費已逾期，總計新台幣1058元整，務請於6月14日前處理繳費，詳情繳費：(網址)，若再超過上述日期，將停止收費"
+]
 
 @app.get("/health")
 async def health():
@@ -53,7 +66,9 @@ async def handle_callback(request: Request):
 
     for event in events:
         if not isinstance(event, MessageEvent) or not isinstance(event.message, TextMessage):
+        if not isinstance(event, MessageEvent) or not isinstance(event.message, TextMessage):
             continue
+
 
         user_id = event.source.user_id
         fdb = firebase.FirebaseApplication(firebase_url, None)
