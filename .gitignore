@@ -25,3 +25,4 @@ firebase.json
 .pytest_cache
 venv
 serviceAccountKey.json
+setEnv.bat
