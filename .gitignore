@@ -26,4 +26,3 @@ firebase.json
 venv
 serviceAccountKey.json
 setEnv.bat
-*.jpg

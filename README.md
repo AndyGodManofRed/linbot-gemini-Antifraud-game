@@ -1,78 +1,45 @@
-# FastAPI LINE Bot with Gemini AI and Firebase Integration
+# {阿不就好會騙}
 
-This project is a FastAPI application that integrates with LINE Messaging API, Gemini AI, and Firebase to handle various types of messages and provide intelligent responses.
+SITCON Hackathon 2024 成果發表
 
-## Features
+## 競賽議題 & 子議題
+- 團隊名稱：{ I'M資安小公組 }
+- 成員姓名：{羅勻瑄}, {陳意璇}, {廖建驊}, {洪若玄}
+- 競賽議題：{公創新世代：學生力量與科技共創公民參與}
+    - 子議題：{對抗網路詐騙假訊息 X LINE}
 
-- **Health Check Endpoint**: Simple endpoint to check if the service is running.
-- **LINE Webhook Handler**: Handles incoming messages from LINE and responds accordingly.
-- **Gemini AI Integration**: Uses Gemini AI to process and generate responses based on the content of the messages.
-- **Firebase Integration**: Stores and retrieves chat history from Firebase.
 
-## Prerequisites
+### 專案簡介
+- 用途/功能：
 
-- Python 3.7+
-- LINE Messaging API account
-- Gemini AI API key
-- Firebase project
-- .env file with the following environment variables:
-  - `API_ENV`
-  - `LINE_CHANNEL_SECRET`
-  - `LINE_CHANNEL_ACCESS_TOKEN`
-  - `LOG`
-  - `FIREBASE_URL`
-  - `GEMINI_API_KEY`
-  - `OPEN_API_KEY`
+    - **真假簡訊生成**: 
+    使用AI生成真實和假冒的簡訊範例，幫助使用者學習區分真假。
+    - **真實案例作為學習範本**: 
+    使用實際的詐騙案例作為AI的學習資料，提升辨識能力。
+    - **互動式學習平台**: 
+    使用者可以通過互動遊戲和題目練習來加深對詐騙的理解。
+    - **LINE平台整合**: 
+    在LINE上實現自動回應、詐騙提醒和積分系統，提供便捷的使用體驗。
 
-## Installation
+### 使用資源
+- 企業資源：
+    - {Gemini}<br>
+    我們所選用的模型。
+- 公開資源：
+    - {台灣事實查核中心}<br>
+    補充我們資訊不足之處。
+    - {165全民防騙網}<br>
+    完整呈現我們的反詐意識。
 
-1. Clone the repository:
-    ```bash
-    git clone <repository_url>
-    cd <repository_directory>
-    ```
+### 你還想分享的事情
+- 開發過程
+  - 程式時好時壞，真該買包乖乖
+- 遇到的困難
+  - 程式到後面突然崩潰，加上時間不太夠，十分緊急。
 
-2. Create and activate a virtual environment:
-    ```bash
-    python -m venv venv
-    source venv/bin/activate  # On Windows use `venv\Scripts\activate`
-    ```
+### 成果展示
+![image](result%20(1).jpg)
+![image](result%20(2).jpg)
+![image](result%20(3).jpg)
+![image](result%20(4).jpg)
 
-3. Install the dependencies:
-    ```bash
-    pip install -r requirements.txt
-    ```
-
-4. Create a `.env` file in the root directory and add the required environment variables.
-
-## Usage
-
-1. Run the FastAPI application:
-    ```bash
-    uvicorn main:app --host 0.0.0.0 --port 8080 --reload
-    ```
-
-2. The application will start and listen for incoming requests on the specified port.
-
-## Endpoints
-
-- **GET /health**: Health check endpoint to verify if the service is running.
-- **POST /webhooks/line**: Webhook endpoint to handle incoming messages from LINE.
-
-## Environment Variables
-
-- `API_ENV`: Set to `production` or `develop`.
-- `LINE_CHANNEL_SECRET`: Your LINE channel secret.
-- `LINE_CHANNEL_ACCESS_TOKEN`: Your LINE channel access token.
-- `LOG`: Logging level (default is `WARNING`).
-- `FIREBASE_URL`: Your Firebase database URL.
-- `GEMINI_API_KEY`: Your Gemini AI API key.
-- `OPEN_API_KEY`: Your Open Data API key.
-
-## Logging
-
-The application uses Python's built-in logging module. The log level can be set using the `LOG` environment variable.
-
-## License
-
-This project is licensed under the MIT License.
