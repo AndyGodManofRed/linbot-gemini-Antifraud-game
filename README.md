@@ -21,6 +21,14 @@ SITCON Hackathon 2024 成果發表
     - **LINE平台整合**: 
     在LINE上實現自動回應、詐騙提醒和積分系統，提供便捷的使用體驗。
 
+### 使用技術
+- linebot
+- gemini
+- GCP (google cloud platform)
+- Docker
+- python 
+  - fastAPI
+  - unvicorn
 ### 使用資源
 - 企業資源：
     - {Gemini}<br>
